@@ -1126,6 +1126,18 @@ fn humanize(key: &str) -> String {
     if key == "gpuMemoryMb" {
         return "GPU Memory (MB, 0 = Automatic)".into();
     }
+    // General › Scroll Wheel Mapping: one row per modifier combination held while turning the wheel.
+    match key {
+        "wheelActionPlain" => return "Scroll Wheel".into(),
+        "wheelActionShift" => return "Shift + Scroll Wheel".into(),
+        "wheelActionCtrl" => return "Ctrl/Cmd + Scroll Wheel".into(),
+        "wheelActionAlt" => return "Alt + Scroll Wheel".into(),
+        "wheelActionShiftAlt" => return "Shift + Alt + Scroll Wheel".into(),
+        "wheelActionCtrlShift" => return "Ctrl/Cmd + Shift + Scroll Wheel".into(),
+        "wheelActionCtrlAlt" => return "Ctrl/Cmd + Alt + Scroll Wheel".into(),
+        "wheelActionCtrlShiftAlt" => return "Ctrl/Cmd + Shift + Alt + Scroll Wheel".into(),
+        _ => {}
+    }
     let mut s = String::new();
     for (i, ch) in key.chars().enumerate() {
         if i == 0 {
@@ -1149,6 +1161,12 @@ fn choice_label(v: &str) -> String {
         "16" => "16 Bits/Channel".into(),
         "postScript" => "PostScript (72 points/inch)".into(),
         "traditional" => "Traditional (72.27 points/inch)".into(),
+        "photoshop" => "Default (as in Photoshop)".into(),
+        "scrollVertical" => "Scroll up and down".into(),
+        "scrollHorizontal" => "Scroll sideways".into(),
+        "zoomContinuous" => "Zoom".into(),
+        "zoomSnap" => "Zoom to the next level".into(),
+        "doNothing" => "Do nothing".into(),
         "vulkan" => "Vulkan".into(),
         "dx12" => "DirectX 12".into(),
         "metal" => "Metal".into(),
