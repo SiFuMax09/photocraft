@@ -1623,6 +1623,12 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
         let v = obj.get(&k).cloned().unwrap_or(Value::Null);
         let human = humanize(&k);
         let label = tl!(&human).to_string();
+        // The first Scroll Wheel Mapping row opens its group.
+        if path == "general.wheelActionPlain" {
+            ui.label(RichText::new(tl!("Scroll Wheel Mapping")).strong().color(t.text));
+            ui.label("");
+            ui.end_row();
+        }
         match &v {
             Value::Bool(b) => {
                 ui.label("");

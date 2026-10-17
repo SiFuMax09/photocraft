@@ -3942,6 +3942,7 @@ cameraData	Lens	Lens
 	Replace it with this document, or cancel and use File › Save As to keep both.	Bu belgeyle değiştirin ya da iptal edip ikisini de korumak için Dosya › Farklı Kaydet'i kullanın.
 
 # Scroll Wheel Mapping (Preferences > General)
+	Scroll Wheel Mapping	Kaydırma tekerleği eşlemesi
 	Scroll Wheel	Kaydırma tekerleği
 	Shift + Scroll Wheel	Shift + Kaydırma tekerleği
 	Ctrl/Cmd + Scroll Wheel	Ctrl/Cmd + Kaydırma tekerleği
