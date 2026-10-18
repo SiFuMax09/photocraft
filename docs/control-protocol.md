@@ -244,6 +244,19 @@ nudge the layers, selection outline or Free Transform box as one history step; a
 keyboard shortcuts, hidden and coloured menu items, autosave interval and crash recovery, and the history
 log text file. GPU on/off and the GPU tile size apply at the next launch.
 
+Scroll Wheel Mapping (Preferences › General, for desktops that keep a modifier for themselves):
+`general.wheelActionPlain`, `wheelActionShift`, `wheelActionCtrl`, `wheelActionAlt`,
+`wheelActionShiftAlt`, `wheelActionCtrlShift`, `wheelActionCtrlAlt` and `wheelActionCtrlShiftAlt`
+each choose what the wheel does over the canvas with those modifiers held (Ctrl is Cmd on macOS):
+`photoshop` (the default: the Photoshop wheel behaviour of the image canvas, including Zoom with Scroll
+Wheel),
+`scrollVertical`, `scrollHorizontal`, `zoomContinuous` (x1.1 per notch), `zoomSnap` (next zoom
+level) or `doNothing`. A mapped wheel moves the view by exactly the wheel's distance in the frame
+it turns. A wheel event whose modifiers are mapped also stays out of the Windows and Linux
+touchpad-pinch fallback (a pinch that arrives as Ctrl + wheel): only combinations left on
+`photoshop` can still be turned into a zoom; a native pinch always zooms. The navigator and the
+Camera Raw preview keep the Photoshop behaviour.
+
 The desktop app stores them in `preferences.json` in the platform config directory (macOS
 `~/Library/Application Support/Photocraft`, Windows `%APPDATA%\Photocraft`, Linux
 `$XDG_CONFIG_HOME/photocraft`; override with `PHOTOCRAFT_CONFIG_DIR`); autosaves go to its
@@ -528,16 +541,6 @@ wheel pans. Pinch zooms. Ctrl/Command +/- zoom, 0 fits, and Alt/Option + Ctrl/Co
 100%; Ctrl/Command+Shift-click also selects 100%. Right-click opens Fit / 100% / preset
 percentages. Tool double-clicks fit the image.
 
-Scroll Wheel Mapping (Preferences › General, for desktops that keep a modifier for themselves):
-`general.wheelActionPlain`, `wheelActionShift`, `wheelActionCtrl`, `wheelActionAlt`,
-`wheelActionShiftAlt`, `wheelActionCtrlShift`, `wheelActionCtrlAlt` and `wheelActionCtrlShiftAlt`
-each choose what the wheel does over the canvas with those modifiers held (Ctrl is Cmd on macOS):
-`photoshop` (the default: the behaviour above, including Zoom with Scroll Wheel),
-`scrollVertical`, `scrollHorizontal`, `zoomContinuous` (x1.1 per notch), `zoomSnap` (next zoom
-level) or `doNothing`. A mapped wheel moves the view by exactly the wheel's distance in the frame
-it turns. Mapping Ctrl + wheel also stops a Windows or Linux touchpad pinch that arrives as
-Ctrl + wheel from being turned into a zoom; a native pinch still zooms. The navigator and the
-Camera Raw preview keep the Photoshop behaviour.
 Text fields retain their keys and wheel gestures over the settings panel still scroll it.
 
 The proxy remains the fast path while changing settings. Where more source pixels are needed,

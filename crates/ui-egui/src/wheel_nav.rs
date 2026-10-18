@@ -120,9 +120,11 @@ pub fn configure(ctx: &Context) {
 /// pinch events (`Event::Zoom`) at egui's Ctrl-scroll zoom speed (`notch` points per line,
 /// `speed` per point). Ctrl + wheel in whole notches (a mouse wheel) is left to scroll sideways,
 /// unless it comes within [`PINCH_GAP`] of a pinch step. `last` is the time of the previous pinch
-/// step; returns the time of the latest one.
-pub fn legacy_pinch_to_zoom(events: &mut [Event], now: f64, last: Option<f64>, notch: f32, speed: f32) -> Option<f64> {
+/// step; returns the time of the latest one. A wheel event whose modifiers the user's Scroll Wheel
+/// Mapping gives an action of its own is no pinch: it reaches [`read_bound`] untouched.
+pub fn legacy_pinch_to_zoom(events: &mut [Event], now: f64, last: Option<f64>, notch: f32, speed: f32, bindings: &Bindings) -> Option<f64> {
     let ctrl_wheel = |e: &Event| match e {
+        Event::MouseWheel { modifiers, .. } if bindings.get(modifiers) != WheelAction::Default => None,
         Event::MouseWheel { unit: MouseWheelUnit::Line, delta, modifiers, .. } if modifiers.ctrl => Some((*delta, false)),
         // Wayland precision touchpads can use point units. These are already actual
         // screen points, not line notches; normalize before the exponential below.
@@ -151,7 +153,7 @@ fn pinch_id() -> Id {
 }
 
 /// [`legacy_pinch_to_zoom`] for one frame's raw input (`raw_input_hook`, Windows and Linux).
-pub fn fold_legacy_pinch(ctx: &Context, raw: &mut RawInput) {
+pub fn fold_legacy_pinch(ctx: &Context, raw: &mut RawInput, bindings: &Bindings) {
     // Native gesture events already carry their own magnification. Some backends
     // also emit a Ctrl-wheel event in the same frame: folding that wheel event
     // would apply the same pinch twice. End any legacy continuation as well,
@@ -163,7 +165,7 @@ pub fn fold_legacy_pinch(ctx: &Context, raw: &mut RawInput) {
     let (notch, speed) = ctx.options(|o| (o.input_options.line_scroll_speed, o.input_options.scroll_zoom_speed));
     let now = raw.time.unwrap_or_else(|| ctx.input(|i| i.time));
     let last = ctx.data(|d| d.get_temp::<f64>(pinch_id()));
-    let latest = legacy_pinch_to_zoom(&mut raw.events, now, last, notch, speed);
+    let latest = legacy_pinch_to_zoom(&mut raw.events, now, last, notch, speed, bindings);
     if latest != last
         && let Some(t) = latest
     {
@@ -210,12 +212,6 @@ impl Bindings {
     /// Does every combination keep the Photoshop behaviour?
     pub fn is_default(&self) -> bool {
         self.actions.iter().all(|a| *a == WheelAction::Default)
-    }
-
-    /// Has Ctrl + wheel been given its own action? Then a touchpad pinch that arrives as Ctrl +
-    /// wheel (Windows, some Linux Wayland systems) must not be folded into a zoom first.
-    pub fn ctrl_is_mapped(&self) -> bool {
-        self.actions.get(Self::index(false, true, false)).is_some_and(|a| *a != WheelAction::Default)
     }
 }
 
@@ -520,7 +516,7 @@ mod tests {
             let mut raw =
                 RawInput { time: Some(f64::from(n) / 60.0), predicted_dt: 1.0 / 60.0, events: frames.next().unwrap_or_default(), ..Default::default() };
             if legacy {
-                fold_legacy_pinch(&ctx, &mut raw);
+                fold_legacy_pinch(&ctx, &mut raw, &Bindings::default());
             }
             let mut out = ctx.run_ui(raw, |ui| match read(ui.ctx(), zoom_with_wheel, true, owner, true) {
                 Some(Wheel::Pan(d)) => pan += d,
@@ -759,10 +755,10 @@ mod tests {
         // Some Wayland compositors report fractional Ctrl-wheel pinch steps in points
         // rather than line units. The delta must not be multiplied by notch twice.
         let mut point = [Event::MouseWheel { unit: MouseWheelUnit::Point, delta: Vec2::new(0.0, 8.0), phase: TouchPhase::Move, modifiers: CTRL }];
-        assert_eq!(legacy_pinch_to_zoom(&mut point, 1.0, None, 40.0, 0.005), Some(1.0));
+        assert_eq!(legacy_pinch_to_zoom(&mut point, 1.0, None, 40.0, 0.005, &Bindings::default()), Some(1.0));
         assert!(matches!(point[0], Event::Zoom(f) if (f - (8.0f32 * 0.005).exp()).abs() < 1e-5));
         let mut wheel_only = [wheel(Vec2::new(0.0, 1.0), CTRL)];
-        assert_eq!(legacy_pinch_to_zoom(&mut wheel_only, 2.0, Some(1.0), 40.0, 0.005), Some(1.0));
+        assert_eq!(legacy_pinch_to_zoom(&mut wheel_only, 2.0, Some(1.0), 40.0, 0.005, &Bindings::default()), Some(1.0));
         assert!(matches!(wheel_only[0], Event::MouseWheel { .. }), "whole mouse notch is not a pinch");
     }
 
@@ -776,38 +772,38 @@ mod tests {
     fn native_pinch_resets_legacy_gesture_continuation() {
         let ctx = Context::default();
         let mut legacy = RawInput { time: Some(1.0), events: vec![wheel(Vec2::new(0.0, 0.25), CTRL)], ..Default::default() };
-        fold_legacy_pinch(&ctx, &mut legacy);
+        fold_legacy_pinch(&ctx, &mut legacy, &Bindings::default());
         assert!(matches!(legacy.events[0], Event::Zoom(_)));
 
         // Native magnification takes over before the synthetic gesture times out.
         let mut native = RawInput { time: Some(1.1), events: vec![Event::Zoom(1.1), wheel(Vec2::new(0.0, 0.25), CTRL)], ..Default::default() };
-        fold_legacy_pinch(&ctx, &mut native);
+        fold_legacy_pinch(&ctx, &mut native, &Bindings::default());
         assert!(matches!(native.events[0], Event::Zoom(f) if (f - 1.1).abs() < 1e-5));
         assert!(matches!(native.events[1], Event::MouseWheel { .. }));
 
         // A notched mouse scroll must no longer inherit the previous pinch.
         let mut notch = RawInput { time: Some(1.12), events: vec![wheel(Vec2::new(0.0, 1.0), CTRL)], ..Default::default() };
-        fold_legacy_pinch(&ctx, &mut notch);
+        fold_legacy_pinch(&ctx, &mut notch, &Bindings::default());
         assert!(matches!(notch.events[0], Event::MouseWheel { .. }));
     }
 
     #[test]
     fn a_whole_notch_inside_a_pinch_stays_a_pinch() {
         let mut ev = [wheel(Vec2::new(0.0, 0.5), CTRL)];
-        let t = legacy_pinch_to_zoom(&mut ev, 1.0, None, 40.0, 0.005);
+        let t = legacy_pinch_to_zoom(&mut ev, 1.0, None, 40.0, 0.005, &Bindings::default());
         assert_eq!(t, Some(1.0));
         assert!(matches!(ev[0], Event::Zoom(f) if (f - 0.1f32.exp()).abs() < 1e-5), "{ev:?}");
         // The next step lands on a whole notch: still the pinch.
         let mut ev = [wheel(Vec2::new(0.0, -1.0), CTRL)];
-        assert_eq!(legacy_pinch_to_zoom(&mut ev, 1.1, t, 40.0, 0.005), Some(1.1));
+        assert_eq!(legacy_pinch_to_zoom(&mut ev, 1.1, t, 40.0, 0.005, &Bindings::default()), Some(1.1));
         assert!(matches!(ev[0], Event::Zoom(f) if f < 1.0), "{ev:?}");
         // Long after: a mouse wheel notch, untouched.
         let mut ev = [wheel(Vec2::new(0.0, -1.0), CTRL)];
-        assert_eq!(legacy_pinch_to_zoom(&mut ev, 2.0, Some(1.1), 40.0, 0.005), Some(1.1));
+        assert_eq!(legacy_pinch_to_zoom(&mut ev, 2.0, Some(1.1), 40.0, 0.005, &Bindings::default()), Some(1.1));
         assert!(matches!(ev[0], Event::MouseWheel { .. }));
         // Without Ctrl nothing is a pinch.
         let mut ev = [wheel(Vec2::new(0.0, 0.5), Modifiers::NONE)];
-        assert_eq!(legacy_pinch_to_zoom(&mut ev, 2.0, None, 40.0, 0.005), None);
+        assert_eq!(legacy_pinch_to_zoom(&mut ev, 2.0, None, 40.0, 0.005, &Bindings::default()), None);
         assert!(matches!(ev[0], Event::MouseWheel { .. }));
     }
 
@@ -849,8 +845,8 @@ mod tests {
                         }
                     }
                     let mut ev = [wheel(Vec2::new(s, 0.5), CTRL)];
-                    let _ = legacy_pinch_to_zoom(&mut ev, f64::NAN, Some(f64::NAN), notch, 0.005);
-                    let _ = legacy_pinch_to_zoom(&mut ev, 0.0, None, notch, f32::NAN);
+                    let _ = legacy_pinch_to_zoom(&mut ev, f64::NAN, Some(f64::NAN), notch, 0.005, &Bindings::default());
+                    let _ = legacy_pinch_to_zoom(&mut ev, 0.0, None, notch, f32::NAN, &Bindings::default());
                     if let Event::Zoom(f) = ev[0] {
                         assert!(f.is_finite() && f > 0.0, "{f}");
                     }
@@ -1128,17 +1124,32 @@ mod tests {
     #[test]
     fn the_default_mapping_changes_nothing() {
         let b = Bindings::default();
-        assert!(b.is_default() && !b.ctrl_is_mapped());
+        assert!(b.is_default());
         let frames = || vec![vec![wheel(Vec2::new(0.0, 1.0), CTRL)], vec![wheel(Vec2::new(0.0, 1.0), Modifiers::NONE)]];
         let (pan, zoom, _) = mapped(frames(), &b);
         let (want_pan, want_zoom, _) = gesture(frames(), false, false);
         assert!((pan - want_pan).length() < 1e-3 && (zoom - want_zoom).abs() < 1e-6, "{pan:?} {zoom} vs {want_pan:?} {want_zoom}");
     }
 
+    /// A mapping on Ctrl + Shift or Ctrl + Alt must not be eaten by the pinch fallback (Wayland, Windows),
+    /// while a plain Ctrl pinch still folds into a zoom.
+    #[test]
+    fn a_mapped_ctrl_combination_is_not_folded_into_a_pinch() {
+        let ctrl_shift = Modifiers { shift: true, ..CTRL };
+        let b = bindings(&[(ctrl_shift, WheelAction::ScrollHorizontal)]);
+        let mapped_wheel = || wheel(Vec2::new(0.0, 0.25), ctrl_shift);
+        let mut ev = vec![mapped_wheel()];
+        assert_eq!(legacy_pinch_to_zoom(&mut ev, 1.0, None, 40.0, 0.005, &b), None, "no pinch step");
+        assert!(matches!(ev[0], Event::MouseWheel { .. }), "the mapped event is left as it is");
+        let mut ev = vec![wheel(Vec2::new(0.0, 0.25), CTRL), mapped_wheel()];
+        assert_eq!(legacy_pinch_to_zoom(&mut ev, 1.0, None, 40.0, 0.005, &b), Some(1.0), "plain Ctrl still pinches");
+        assert!(matches!(ev[0], Event::Zoom(_)));
+        assert!(matches!(ev[1], Event::MouseWheel { .. }));
+    }
+
     #[test]
     fn ctrl_wheel_can_zoom_like_a_browser() {
         let b = bindings(&[(CTRL, WheelAction::Zoom)]);
-        assert!(b.ctrl_is_mapped());
         let (pan, zoom, snaps) = mapped(vec![vec![wheel(Vec2::new(0.0, 1.0), CTRL)]], &b);
         assert!((zoom - NOTCH).abs() < 1e-5, "one notch is one x1.1 step, got {zoom}");
         assert_eq!((pan, snaps), (Vec2::ZERO, 0), "and the smoothed tail pans nothing");
