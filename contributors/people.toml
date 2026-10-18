@@ -170,3 +170,9 @@ sync_github_name = true
 real_name = "Max Witt"
 display_name = "SiFuMax"
 sync_github_name = false
+[people.Silvertree2010]
+display_name = "Netter"
+sync_github_name = false
+
+[people.Byxis]
+sync_github_name = true
