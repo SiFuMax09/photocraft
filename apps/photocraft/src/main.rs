@@ -912,8 +912,7 @@ fn main() -> eframe::Result {
         }
         if let Ok(exe) = std::env::current_exe() {
             let launched = std::process::Command::new(exe)
-                .args(std::env::args_os().skip(1))
-                .arg("--safe-gpu")
+                .args(crash_guard::with_safe_gpu(&std::env::args_os().skip(1).collect::<Vec<_>>()))
                 .env_remove("WGPU_BACKEND")
                 .env("PHOTOCRAFT_GPU_STARTUP_FAILURE", &reason)
                 .spawn();

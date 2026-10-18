@@ -28,10 +28,19 @@ pub fn install_hook() {
     }));
 }
 
+/// `args` with `--safe-gpu` added before the `--` separator (after it every argument is a file,
+/// so a trailing flag would be opened as one and never reach the launch options).
+pub fn with_safe_gpu(args: &[OsString]) -> Vec<OsString> {
+    let mut out = args.to_vec();
+    let at = out.iter().position(|a| a == "--").unwrap_or(out.len());
+    out.insert(at, OsString::from("--safe-gpu"));
+    out
+}
+
 /// The command that restarts this program in CPU compatibility mode.
 fn safe_relaunch_command(exe: &std::path::Path, args: &[OsString], reason: &str) -> Command {
     let mut cmd = Command::new(exe);
-    cmd.args(args).arg("--safe-gpu").env_remove("WGPU_BACKEND").env("PHOTOCRAFT_GPU_STARTUP_FAILURE", reason);
+    cmd.args(with_safe_gpu(args)).env_remove("WGPU_BACKEND").env("PHOTOCRAFT_GPU_STARTUP_FAILURE", reason);
     cmd
 }
 
@@ -74,6 +83,9 @@ mod tests {
         let cmd = safe_relaunch_command(std::path::Path::new("/x/PhotoCraft"), &["a.psd".into()], "boom");
         let args: Vec<_> = cmd.get_args().collect();
         assert_eq!(args, ["a.psd", "--safe-gpu"]);
+        let cmd = safe_relaunch_command(std::path::Path::new("/x/PhotoCraft"), &["--".into(), "a.psd".into()], "boom");
+        let args: Vec<_> = cmd.get_args().collect();
+        assert_eq!(args, ["--safe-gpu", "--", "a.psd"], "the flag goes before the file separator");
         let env: Vec<_> = cmd.get_envs().map(|(k, v)| (k.to_string_lossy().into_owned(), v.map(|v| v.to_string_lossy().into_owned()))).collect();
         assert!(env.contains(&("WGPU_BACKEND".into(), None)));
         assert!(env.contains(&("PHOTOCRAFT_GPU_STARTUP_FAILURE".into(), Some("boom".into()))));
