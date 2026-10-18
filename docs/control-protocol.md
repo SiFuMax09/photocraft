@@ -251,8 +251,9 @@ each choose what the wheel does over the canvas with those modifiers held (Ctrl 
 `photoshop` (the default: the Photoshop wheel behaviour of the image canvas, including Zoom with Scroll
 Wheel),
 `scrollVertical`, `scrollHorizontal`, `zoomContinuous` (x1.1 per notch), `zoomSnap` (next zoom
-level) or `doNothing`. A mapped wheel moves the view by exactly the wheel's distance in the frame
-it turns. A wheel event whose modifiers are mapped also stays out of the Windows and Linux
+level) or `doNothing`. Scroll mappings move the view by exactly the wheel's distance in the frame
+the event arrives, without glide. Continuous zoom scales by the wheel's distance; snap zoom adds
+it up and steps through the zoom levels once it adds up to one. A wheel event whose modifiers are mapped also stays out of the Windows and Linux
 touchpad-pinch fallback (a pinch that arrives as Ctrl + wheel): only combinations left on
 `photoshop` can still be turned into a zoom; a native pinch always zooms. The navigator and the
 Camera Raw preview keep the Photoshop behaviour.
